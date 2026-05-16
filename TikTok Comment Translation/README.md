@@ -1,4 +1,4 @@
-# TikTok Comment Translator (Multi-Provider)
+# TikTok Comment Translation
 
 为 TikTok 网页端评论添加翻译按钮。基于 [DuckCIT/TikTok-Comment-Translator](https://github.com/DuckCIT/TikTok-Comment-Translator) 的修改版。
 
