@@ -1,0 +1,52 @@
+{
+  "manifest_version": 3,
+  "name": "TikTok 无水印下载",
+  "version": "2.1.0",
+  "description": "在 TikTok 网页版下载无水印视频/图集。大视频自动分离视频+音频或下载含音频版本（可切换）。点击悬浮按钮或 Shift+D。",
+  "permissions": [
+    "storage",
+    "declarativeNetRequest",
+    "declarativeNetRequestWithHostAccess"
+  ],
+  "host_permissions": [
+    "*://*.tiktok.com/*",
+    "*://*.tiktokcdn.com/*",
+    "*://*.tiktokcdn-us.com/*",
+    "*://*.tiktokcdn-eu.com/*",
+    "*://*.tiktokv.com/*",
+    "*://*.tiktokv-us.com/*",
+    "*://*.musical.ly/*",
+    "*://*.ttlivecdn.com/*",
+    "*://*.byteoversea.com/*",
+    "*://*.bytedance.net/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["*://*.tiktok.com/*", "*://tiktok.com/*"],
+      "js": ["inject.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["*://*.tiktok.com/*", "*://tiktok.com/*"],
+      "js": ["content.js"],
+      "css": ["style.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "TikTok 无水印下载",
+    "default_icon": {
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "icons": {
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}
