@@ -1,175 +1,231 @@
 {
-	"zh": {
-		"popup": {
-			"mainHeading": "选择要翻译成的语言",
-			"refreshHint": "切换设置无需刷新,实时生效",
-			"copyright": "© 2025 DuckCIT (Multi-Provider Fork)",
-			"sourceLink": "GitHub 源码",
-			"apiInfo": "支持 Google / Gemini / OpenAI 兼容 / Claude",
-			"engineLabel": "翻译引擎",
-			"providerLabel": "翻译服务商",
-			"engineGoogle": "Google 翻译（免费）",
-			"engineGemini": "Gemini",
-			"engineOpenAI": "OpenAI 兼容（自填 endpoint）",
-			"engineAnthropic": "Anthropic Claude",
-			"apiKeyLabel": "API Key",
-			"endpointLabel": "API Endpoint",
-			"modelLabel": "模型名",
-			"apiKeyHint": "Key 仅保存在本地（chrome.storage.local），不会同步到其它设备。",
-			"geminiKeyHint": "在 aistudio.google.com/apikey 获取。",
-			"openaiKeyHint": "兼容 OpenAI 官方 / DeepSeek / OpenRouter / 自部署等所有 OpenAI 协议端点。Endpoint 填到 /v1 即可。",
-			"anthropicKeyHint": "在 console.anthropic.com 获取。",
-			"testButton": "测试连接",
-			"testing": "测试中...",
-			"testSuccess": "✓ 连接正常",
-			"testFailed": "✗ 失败",
-			"fallbackLabel": "LLM 失败时自动降级到 Google 翻译",
-			"languageNames": {
-				"vi": "Tiếng Việt (越南语)",
-				"en": "English (英语)",
-				"zh": "中文",
-				"ru": "Русский (俄语)",
-				"es": "Español (西班牙语)",
-				"fr": "Français (法语)",
-				"ja": "日本語 (日语)",
-				"ko": "한국어 (韩语)"
-			}
-		},
-		"content": {
-			"translate": "查看翻译",
-			"original": "查看原文",
-			"translating": "翻译中...",
-			"errors": {
-				"apiError": "API 无响应",
-				"invalidData": "返回数据无效",
-				"translateError": "翻译出错",
-				"missingApiKey": "API Key 未配置"
-			}
-		},
-		"geminiName": "Simplified Chinese"
-	},
-	"en": {
-		"popup": {
-			"mainHeading": "Choose the language to translate into",
-			"refreshHint": "Settings apply instantly, no refresh needed",
-			"copyright": "© 2025 DuckCIT (Multi-Provider Fork)",
-			"sourceLink": "Source on GitHub",
-			"apiInfo": "Supports Google / Gemini / OpenAI-compatible / Claude",
-			"engineLabel": "Translation engine",
-			"providerLabel": "Provider",
-			"engineGoogle": "Google Translate (free)",
-			"engineGemini": "Gemini",
-			"engineOpenAI": "OpenAI-compatible (custom endpoint)",
-			"engineAnthropic": "Anthropic Claude",
-			"apiKeyLabel": "API Key",
-			"endpointLabel": "API Endpoint",
-			"modelLabel": "Model",
-			"apiKeyHint": "Key is stored locally only (chrome.storage.local), not synced.",
-			"geminiKeyHint": "Get one at aistudio.google.com/apikey.",
-			"openaiKeyHint": "Works with OpenAI / DeepSeek / OpenRouter / self-hosted / any OpenAI-compatible endpoint. Endpoint goes up to /v1.",
-			"anthropicKeyHint": "Get one at console.anthropic.com.",
-			"testButton": "Test connection",
-			"testing": "Testing...",
-			"testSuccess": "✓ OK",
-			"testFailed": "✗ Failed",
-			"fallbackLabel": "Auto fall back to Google when LLM fails",
-			"languageNames": {
-				"vi": "Tiếng Việt (Vietnamese)",
-				"en": "English",
-				"zh": "中文 (Chinese)",
-				"ru": "Русский (Russian)",
-				"es": "Español (Spanish)",
-				"fr": "Français (French)",
-				"ja": "日本語 (Japanese)",
-				"ko": "한국어 (Korean)"
-			}
-		},
-		"content": {
-			"translate": "View translation",
-			"original": "View original",
-			"translating": "Translating...",
-			"errors": {
-				"apiError": "API did not respond",
-				"invalidData": "Invalid response data",
-				"translateError": "Translation error",
-				"missingApiKey": "API Key is not configured"
-			}
-		},
-		"geminiName": "English"
-	},
-	"ja": {
-		"popup": {
-			"languageNames": {
-				"vi": "Tiếng Việt", "en": "English", "zh": "中文", "ru": "Русский",
-				"es": "Español", "fr": "Français", "ja": "日本語", "ko": "한국어"
-			}
-		},
-		"content": {
-			"translate": "翻訳を見る",
-			"original": "原文を見る",
-			"translating": "翻訳中...",
-			"errors": {}
-		},
-		"geminiName": "Japanese"
-	},
-	"ko": {
-		"popup": {
-			"languageNames": {
-				"vi": "Tiếng Việt", "en": "English", "zh": "中文", "ru": "Русский",
-				"es": "Español", "fr": "Français", "ja": "日本語", "ko": "한국어"
-			}
-		},
-		"content": {
-			"translate": "번역 보기",
-			"original": "원문 보기",
-			"translating": "번역 중...",
-			"errors": {}
-		},
-		"geminiName": "Korean"
-	},
-	"vi": {
-		"popup": {
-			"languageNames": {
-				"vi": "Tiếng Việt", "en": "English", "zh": "中文", "ru": "Русский",
-				"es": "Español", "fr": "Français", "ja": "日本語", "ko": "한국어"
-			}
-		},
-		"content": {
-			"translate": "Xem bản dịch",
-			"original": "Xem bản gốc",
-			"translating": "Đang dịch...",
-			"errors": {}
-		},
-		"geminiName": "Vietnamese"
-	},
-	"ru": {
-		"popup": { "languageNames": {} },
-		"content": {
-			"translate": "Посмотреть перевод",
-			"original": "Посмотреть оригинал",
-			"translating": "Перевод...",
-			"errors": {}
-		},
-		"geminiName": "Russian"
-	},
-	"es": {
-		"popup": { "languageNames": {} },
-		"content": {
-			"translate": "Ver traducción",
-			"original": "Ver original",
-			"translating": "Traduciendo...",
-			"errors": {}
-		},
-		"geminiName": "Spanish"
-	},
-	"fr": {
-		"popup": { "languageNames": {} },
-		"content": {
-			"translate": "Voir la traduction",
-			"original": "Voir l'original",
-			"translating": "Traduction...",
-			"errors": {}
-		},
-		"geminiName": "French"
-	}
+    "zh": {
+        "popup": {
+            "mainHeading": "选择要翻译成的语言",
+            "refreshHint": "切换设置无需刷新,实时生效",
+            "copyright": "© 2025 DuckCIT (Multi-Provider Fork)",
+            "sourceLink": "GitHub 源码",
+            "apiInfo": "支持 Google / Gemini / OpenAI 兼容 / Claude",
+            "engineLabel": "翻译引擎",
+            "providerLabel": "翻译服务商",
+            "engineGoogle": "Google 翻译（免费）",
+            "engineGemini": "Gemini",
+            "engineOpenAI": "OpenAI 兼容（自填 endpoint）",
+            "engineAnthropic": "Anthropic Claude",
+            "apiKeyLabel": "API Key",
+            "endpointLabel": "API Endpoint",
+            "modelLabel": "模型名",
+            "apiKeyHint": "Key 仅保存在本地（chrome.storage.local），不会同步到其它设备。",
+            "geminiKeyHint": "在 aistudio.google.com/apikey 获取。",
+            "openaiKeyHint": "兼容 OpenAI 官方 / DeepSeek / OpenRouter / 自部署等所有 OpenAI 协议端点。Endpoint 填到 /v1 即可。",
+            "anthropicKeyHint": "在 console.anthropic.com 获取。",
+            "testButton": "测试连接",
+            "testing": "测试中...",
+            "testSuccess": "✓ 连接正常",
+            "testFailed": "✗ 失败",
+            "fallbackLabel": "LLM 失败时自动降级到 Google 翻译",
+            "languageNames": {
+                "vi": "Tiếng Việt (越南语)",
+                "en": "English (英语)",
+                "zh": "中文",
+                "ru": "Русский (俄语)",
+                "es": "Español (西班牙语)",
+                "fr": "Français (法语)",
+                "ja": "日本語 (日语)",
+                "ko": "한국어 (韩语)"
+            },
+            "liveTranslateLabel": "直播间评论翻译",
+            "liveTranslateHint": "在直播间自动批量翻译聊天消息。会持续产生 API 调用,LLM 引擎下注意用量。"
+        },
+        "content": {
+            "translate": "查看翻译",
+            "original": "查看原文",
+            "translating": "翻译中...",
+            "errors": {
+                "apiError": "API 无响应",
+                "invalidData": "返回数据无效",
+                "translateError": "翻译出错",
+                "missingApiKey": "API Key 未配置"
+            },
+            "liveOn": "AI译 开",
+            "liveOff": "AI译 关"
+        },
+        "geminiName": "Simplified Chinese"
+    },
+    "en": {
+        "popup": {
+            "mainHeading": "Choose the language to translate into",
+            "refreshHint": "Settings apply instantly, no refresh needed",
+            "copyright": "© 2025 DuckCIT (Multi-Provider Fork)",
+            "sourceLink": "Source on GitHub",
+            "apiInfo": "Supports Google / Gemini / OpenAI-compatible / Claude",
+            "engineLabel": "Translation engine",
+            "providerLabel": "Provider",
+            "engineGoogle": "Google Translate (free)",
+            "engineGemini": "Gemini",
+            "engineOpenAI": "OpenAI-compatible (custom endpoint)",
+            "engineAnthropic": "Anthropic Claude",
+            "apiKeyLabel": "API Key",
+            "endpointLabel": "API Endpoint",
+            "modelLabel": "Model",
+            "apiKeyHint": "Key is stored locally only (chrome.storage.local), not synced.",
+            "geminiKeyHint": "Get one at aistudio.google.com/apikey.",
+            "openaiKeyHint": "Works with OpenAI / DeepSeek / OpenRouter / self-hosted / any OpenAI-compatible endpoint. Endpoint goes up to /v1.",
+            "anthropicKeyHint": "Get one at console.anthropic.com.",
+            "testButton": "Test connection",
+            "testing": "Testing...",
+            "testSuccess": "✓ OK",
+            "testFailed": "✗ Failed",
+            "fallbackLabel": "Auto fall back to Google when LLM fails",
+            "languageNames": {
+                "vi": "Tiếng Việt (Vietnamese)",
+                "en": "English",
+                "zh": "中文 (Chinese)",
+                "ru": "Русский (Russian)",
+                "es": "Español (Spanish)",
+                "fr": "Français (French)",
+                "ja": "日本語 (Japanese)",
+                "ko": "한국어 (Korean)"
+            },
+            "liveTranslateLabel": "Live chat translation",
+            "liveTranslateHint": "Auto-translate live chat in batches. Generates continuous API calls — watch usage on LLM engines."
+        },
+        "content": {
+            "translate": "View translation",
+            "original": "View original",
+            "translating": "Translating...",
+            "errors": {
+                "apiError": "API did not respond",
+                "invalidData": "Invalid response data",
+                "translateError": "Translation error",
+                "missingApiKey": "API Key is not configured"
+            },
+            "liveOn": "AI Trans ON",
+            "liveOff": "AI Trans OFF"
+        },
+        "geminiName": "English"
+    },
+    "ja": {
+        "popup": {
+            "languageNames": {
+                "vi": "Tiếng Việt",
+                "en": "English",
+                "zh": "中文",
+                "ru": "Русский",
+                "es": "Español",
+                "fr": "Français",
+                "ja": "日本語",
+                "ko": "한국어"
+            },
+            "liveTranslateLabel": "ライブチャット翻訳",
+            "liveTranslateHint": "Auto-translate live chat in batches. Generates continuous API calls — watch usage on LLM engines."
+        },
+        "content": {
+            "translate": "翻訳を見る",
+            "original": "原文を見る",
+            "translating": "翻訳中...",
+            "errors": {},
+            "liveOn": "AI翻訳 ON",
+            "liveOff": "AI翻訳 OFF"
+        },
+        "geminiName": "Japanese"
+    },
+    "ko": {
+        "popup": {
+            "languageNames": {
+                "vi": "Tiếng Việt",
+                "en": "English",
+                "zh": "中文",
+                "ru": "Русский",
+                "es": "Español",
+                "fr": "Français",
+                "ja": "日本語",
+                "ko": "한국어"
+            },
+            "liveTranslateLabel": "라이브 채팅 번역",
+            "liveTranslateHint": "Auto-translate live chat in batches. Generates continuous API calls — watch usage on LLM engines."
+        },
+        "content": {
+            "translate": "번역 보기",
+            "original": "원문 보기",
+            "translating": "번역 중...",
+            "errors": {},
+            "liveOn": "AI번역 ON",
+            "liveOff": "AI번역 OFF"
+        },
+        "geminiName": "Korean"
+    },
+    "vi": {
+        "popup": {
+            "languageNames": {
+                "vi": "Tiếng Việt",
+                "en": "English",
+                "zh": "中文",
+                "ru": "Русский",
+                "es": "Español",
+                "fr": "Français",
+                "ja": "日本語",
+                "ko": "한국어"
+            },
+            "liveTranslateLabel": "Dịch bình luận live",
+            "liveTranslateHint": "Auto-translate live chat in batches. Generates continuous API calls — watch usage on LLM engines."
+        },
+        "content": {
+            "translate": "Xem bản dịch",
+            "original": "Xem bản gốc",
+            "translating": "Đang dịch...",
+            "errors": {},
+            "liveOn": "AI dịch BẬT",
+            "liveOff": "AI dịch TẮT"
+        },
+        "geminiName": "Vietnamese"
+    },
+    "ru": {
+        "popup": {
+            "languageNames": {},
+            "liveTranslateLabel": "Перевод чата трансляции",
+            "liveTranslateHint": "Auto-translate live chat in batches. Generates continuous API calls — watch usage on LLM engines."
+        },
+        "content": {
+            "translate": "Посмотреть перевод",
+            "original": "Посмотреть оригинал",
+            "translating": "Перевод...",
+            "errors": {},
+            "liveOn": "AI перевод ВКЛ",
+            "liveOff": "AI перевод ВЫКЛ"
+        },
+        "geminiName": "Russian"
+    },
+    "es": {
+        "popup": {
+            "languageNames": {},
+            "liveTranslateLabel": "Traducción del chat en vivo",
+            "liveTranslateHint": "Auto-translate live chat in batches. Generates continuous API calls — watch usage on LLM engines."
+        },
+        "content": {
+            "translate": "Ver traducción",
+            "original": "Ver original",
+            "translating": "Traduciendo...",
+            "errors": {},
+            "liveOn": "AI trad. ON",
+            "liveOff": "AI trad. OFF"
+        },
+        "geminiName": "Spanish"
+    },
+    "fr": {
+        "popup": {
+            "languageNames": {},
+            "liveTranslateLabel": "Traduction du chat en direct",
+            "liveTranslateHint": "Auto-translate live chat in batches. Generates continuous API calls — watch usage on LLM engines."
+        },
+        "content": {
+            "translate": "Voir la traduction",
+            "original": "Voir l'original",
+            "translating": "Traduction...",
+            "errors": {},
+            "liveOn": "AI trad. ON",
+            "liveOff": "AI trad. OFF"
+        },
+        "geminiName": "French"
+    }
 }

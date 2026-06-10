@@ -71,6 +71,55 @@ async function callProvider(providerId, text, target, settings) {
 	}
 }
 
+const BATCH_TIMEOUT_MS = 30000;
+
+async function callProviderBatch(providerId, items, target, settings) {
+	const provider = PROVIDERS[providerId] || PROVIDERS.google;
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => controller.abort(), BATCH_TIMEOUT_MS);
+	try {
+		return await provider.translateBatch(items, target, { signal: controller.signal, settings });
+	} finally {
+		clearTimeout(timeoutId);
+	}
+}
+
+// 批量翻译: { type: 'ttct.translateBatch', items: string[], ... }
+//   -> { ok: true, results: string[], via } | { ok: false, error }
+// 降级规则和单条一致 (auth/config 不降级,其余降级到 Google 批量)。
+async function handleTranslateBatch({ items, providerId, targetLangCode, targetLangName, settings }) {
+	providerId = providerId || 'google';
+	if (!Array.isArray(items) || items.length === 0) {
+		return { ok: false, error: { kind: 'config', message: 'items 为空', status: 0 } };
+	}
+	const target = providerId === 'google' ? targetLangCode : targetLangName;
+
+	const permErr = await checkEndpointPermission(providerId, settings);
+	if (permErr) return { ok: false, error: permErr };
+
+	try {
+		const results = await callProviderBatch(providerId, items, target, settings);
+		return { ok: true, results, via: providerId };
+	} catch (err) {
+		const plain = toPlainError(err);
+		const shouldFallback = providerId !== 'google'
+			&& plain.kind !== 'auth'
+			&& plain.kind !== 'config'
+			&& settings.llmFallbackToGoogle;
+
+		if (shouldFallback) {
+			console.warn(`[ttct] batch ${providerId} failed, falling back to Google:`, plain.message);
+			try {
+				const results = await callProviderBatch('google', items, targetLangCode, settings);
+				return { ok: true, results, via: 'google' };
+			} catch (fbErr) {
+				return { ok: false, error: toPlainError(fbErr) };
+			}
+		}
+		return { ok: false, error: plain };
+	}
+}
+
 async function handleTranslate({ text, providerId, targetLangCode, targetLangName, settings }) {
 	providerId = providerId || 'google';
 	const target = providerId === 'google' ? targetLangCode : targetLangName;
@@ -122,6 +171,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 	if (msg?.type === 'ttct.translate') {
 		handleTranslate(msg).then(sendResponse);
 		return true; // 异步响应
+	}
+	if (msg?.type === 'ttct.translateBatch') {
+		handleTranslateBatch(msg).then(sendResponse);
+		return true;
 	}
 	if (msg?.type === 'ttct.test') {
 		handleTest(msg).then(sendResponse);

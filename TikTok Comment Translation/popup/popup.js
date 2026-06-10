@@ -36,6 +36,8 @@ document.addEventListener('DOMContentLoaded', () => {
 	const fallbackField = $('fallbackField');
 	const fallbackCheckbox = $('fallbackCheckbox');
 
+	const liveTranslateCheckbox = $('liveTranslateCheckbox');
+
 	let translations = {};
 
 	// manifest host_permissions 已覆盖的 origin,自定义端点之外不需要动态授权
@@ -55,6 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
 		openaiModel: 'gpt-4o-mini',
 		anthropicModel: 'claude-haiku-4-5-20251001',
 		llmFallbackToGoogle: true,
+		liveTranslateEnabled: false,
 	};
 	const LOCAL_DEFAULTS = {
 		geminiApiKey: '',
@@ -75,6 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
 					openaiModelInput.value = syncRes.openaiModel;
 					anthropicModelInput.value = syncRes.anthropicModel;
 					fallbackCheckbox.checked = syncRes.llmFallbackToGoogle;
+					liveTranslateCheckbox.checked = syncRes.liveTranslateEnabled;
 
 					geminiKeyInput.value = localRes.geminiApiKey;
 					openaiKeyInput.value = localRes.openaiApiKey;
@@ -118,6 +122,8 @@ document.addEventListener('DOMContentLoaded', () => {
 		$('anthropicKeyHint').textContent = t('anthropicKeyHint');
 		$('globalKeyHint').textContent = t('apiKeyHint');
 		$('fallbackLabel').textContent = t('fallbackLabel');
+		$('liveTranslateLabel').textContent = t('liveTranslateLabel');
+		$('liveTranslateHint').textContent = t('liveTranslateHint');
 		testButton.textContent = t('testButton');
 	}
 
@@ -162,6 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
 	openaiModelInput.addEventListener('input', () => saveSync({ openaiModel: openaiModelInput.value.trim() }));
 	anthropicModelInput.addEventListener('input', () => saveSync({ anthropicModel: anthropicModelInput.value.trim() }));
 	fallbackCheckbox.addEventListener('change', () => saveSync({ llmFallbackToGoogle: fallbackCheckbox.checked }));
+	liveTranslateCheckbox.addEventListener('change', () => saveSync({ liveTranslateEnabled: liveTranslateCheckbox.checked }));
 
 	geminiKeyInput.addEventListener('input', () => saveLocal({ geminiApiKey: geminiKeyInput.value.trim() }));
 	openaiKeyInput.addEventListener('input', () => saveLocal({ openaiApiKey: openaiKeyInput.value.trim() }));

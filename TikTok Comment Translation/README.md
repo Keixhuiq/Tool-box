@@ -1,6 +1,6 @@
 # TikTok Comment Translation
 
-为 TikTok 网页端评论添加翻译按钮。基于 [DuckCIT/TikTok-Comment-Translator](https://github.com/DuckCIT/TikTok-Comment-Translator) 的修改版。
+为 TikTok 网页端视频评论添加翻译按钮，并支持直播间聊天自动翻译。基于 [DuckCIT/TikTok-Comment-Translator](https://github.com/DuckCIT/TikTok-Comment-Translator) 的修改版。
 
 ## 支持的翻译服务商
 
@@ -8,6 +8,18 @@
 - **Gemini**：需自填 key，默认 `gemini-2.5-flash`
 - **OpenAI 兼容**：自填 endpoint + model + key，覆盖 OpenAI 官方 / DeepSeek / OpenRouter / SiliconFlow / 自部署 vLLM / Ollama 等所有 OpenAI 协议端点
 - **Anthropic Claude**：需自填 key，默认 `claude-haiku-4-5-20251001`
+
+## v1.4.0 更新
+
+- 新增 TikTok 直播间聊天自动翻译，总开关默认关闭，可在扩展弹窗中开启。
+- 直播消息译文以附加小字显示在原文下方，不直接修改 TikTok 的原始文本节点。
+- 每 1.5 秒扫描当前可见消息；单批去重后最多翻译 30 条，最多允许 2 个批次同时进行，避免请求无限堆积。
+- Google 使用换行合并批量翻译；Gemini、OpenAI 兼容和 Anthropic 使用 JSON 数组批量输入输出，减少请求次数和 token 消耗。
+- 自动跳过纯 emoji、符号、数字，以及大概率已经是中文、日文、韩文或俄文目标语言的消息。
+- 增加 2000 条直播文本 LRU 缓存，重复刷屏内容可直接复用译文。
+- 针对 TikTok 直播虚拟列表的 DOM 节点复用，使用内容指纹重新识别消息，避免旧译文附到新消息上。
+- 直播间内提供临时开关；认证、配置或权限错误会自动暂停直播翻译并显示错误类型。
+- 新增直播开关和状态文案的多语言翻译。
 
 ## v1.3.0 更新
 
@@ -52,6 +64,15 @@
 - 本版把评论区观察器固定在 `document.body`，切换视频并替换评论容器后仍会继续为新评论添加按钮。
 - TikTok DOM 选择器集中在 `SELECTORS` 中，网站结构变化时更容易集中维护。
 
+### 直播间翻译
+
+- 直播翻译默认关闭，因为持续翻译会产生 API 请求；开启后适用于 Google、Gemini、OpenAI 兼容和 Anthropic Claude。
+- 直播聊天使用独立的 `live.js`，与视频评论逐条点击翻译的交互互不影响。
+- 译文附加在原消息下方，不替换原文，降低与 TikTok React 重渲染发生冲突的概率。
+- 可见消息按批翻译，并通过文本去重、本地语言过滤、LRU 缓存和并发背压控制 API 调用量。
+- TikTok 直播聊天使用虚拟列表，DOM 节点会重复利用；本版通过消息内容指纹判断节点是否承载了新消息。
+- 弹窗中的总开关会持久保存；直播间页面内还有临时开关，可随时暂停当前页面的自动翻译。
+
 ### 性能与错误处理
 
 - 原版缓存是普通 `Map`，没有容量上限；本版改为最多 1000 条的 LRU 缓存，并缓存进行中的 Promise，使同一文本的并发点击只发送一次请求。失败的 Promise 会从缓存删除，允许重试。
@@ -69,6 +90,7 @@
 - 原版 popup 只有目标语言下拉框。
 - 本版 popup 增加 provider 选择、不同 provider 的 key/model/endpoint 配置、测试连接按钮和降级开关。
 - “测试连接”和正式翻译使用同一条后台请求链路；自定义 OpenAI endpoint 的访问权限也在该按钮的用户操作中申请。
+- popup 新增直播间评论翻译总开关，默认关闭，并明确提示 LLM 引擎可能持续产生用量。
 - 原版默认目标语言是越南语；本版默认目标语言是中文。
 - 原版目标语言包括越南语、英语、中文、俄语、西班牙语、法语；本版在此基础上新增日语和韩语。
 - 普通偏好保存在 `chrome.storage.sync`；API key 保存在 `chrome.storage.local`，不会随 Google 账号同步到其它设备。
@@ -92,7 +114,8 @@ manifest.json
 providers.js        # provider 抽象层
 background.js       # 跨域翻译请求、超时、错误分类与降级
 content.js          # 评论页注入逻辑
-content.css         # 按钮样式
+live.js             # 直播间聊天批量自动翻译
+content.css         # 按钮与直播译文样式
 popup/
   popup.html
   popup.js

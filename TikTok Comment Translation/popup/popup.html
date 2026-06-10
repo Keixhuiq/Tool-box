@@ -253,6 +253,15 @@
 		</label>
 	</div>
 
+	<!-- 直播间翻译总开关 (默认关: 持续产生 API 调用,必须用户主动开启) -->
+	<div class="field">
+		<label class="checkbox-field">
+			<input type="checkbox" id="liveTranslateCheckbox" />
+			<span id="liveTranslateLabel">直播间评论翻译</span>
+		</label>
+		<p class="hint" id="liveTranslateHint">在直播间自动批量翻译聊天消息。会持续产生 API 调用,LLM 引擎下注意用量。</p>
+	</div>
+
 	<div class="field">
 		<p class="hint" id="globalKeyHint">Key 仅保存在本地，不会同步到其它设备。</p>
 	</div>

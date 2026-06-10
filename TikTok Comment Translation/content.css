@@ -28,3 +28,45 @@
 	opacity: 0.6;
 	cursor: progress;
 }
+
+/* ===== 直播间模块 (live.js) ===== */
+
+/* 翻译结果: append 在原消息下方的小字,不替换原文 */
+.ttct-live-trans {
+	display: block;
+	font-size: 0.92em;
+	line-height: 1.35;
+	margin-top: 2px;
+	color: var(--ui-text-2, rgba(255, 255, 255, 0.75));
+	opacity: 0.9;
+	word-break: break-word;
+}
+
+/* 自动翻译开关胶囊: 浮在聊天区右上角 */
+.ttct-live-pill {
+	position: absolute;
+	top: 8px;
+	right: 12px;
+	z-index: 50;
+	padding: 3px 10px;
+	border-radius: 999px;
+	font-size: 12px;
+	line-height: 1.5;
+	cursor: pointer;
+	user-select: none;
+	background: rgba(0, 0, 0, 0.45);
+	color: rgba(255, 255, 255, 0.65);
+	border: 1px solid rgba(255, 255, 255, 0.18);
+	backdrop-filter: blur(4px);
+	transition: background 0.15s, color 0.15s;
+}
+
+.ttct-live-pill:hover {
+	background: rgba(0, 0, 0, 0.65);
+}
+
+.ttct-live-pill.active {
+	background: rgba(254, 44, 85, 0.85); /* TikTok 红 */
+	color: #fff;
+	border-color: transparent;
+}

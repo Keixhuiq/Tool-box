@@ -54,6 +54,34 @@ Rules:
 - Preserve the casual tone and emotional register of the original.`;
 	}
 
+	// 批量翻译 prompt: JSON 数组进、JSON 数组出。
+	// 直播聊天每秒几条到几十条,逐条请求会把 token 和速率烧爆,必须合批。
+	function buildBatchSystemPrompt(targetLangName) {
+		return `You are a translator for TikTok live chat messages. You will receive a JSON array of strings. Translate each string into ${targetLangName}.
+
+Rules:
+- Output ONLY a valid JSON array of strings. Same length, same order as the input. No markdown fences, no explanations.
+- Keep emoji, @usernames, and #hashtags exactly as-is.
+- Translate internet slang naturally into the target language's modern equivalent.
+- If a string is already in ${targetLangName}, or is pure symbols/links/unintelligible, copy it unchanged.
+- Preserve the casual tone of each message.`;
+	}
+
+	// 解析 LLM 返回的 JSON 数组,容忍 markdown fence
+	function parseBatchResult(raw, expectedLen) {
+		const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+		let arr;
+		try {
+			arr = JSON.parse(cleaned);
+		} catch {
+			throw new ProviderError('批量翻译: 返回不是合法 JSON', 'other');
+		}
+		if (!Array.isArray(arr) || arr.length !== expectedLen) {
+			throw new ProviderError(`批量翻译: 返回数量不符 (期望 ${expectedLen} 得到 ${Array.isArray(arr) ? arr.length : '非数组'})`, 'other');
+		}
+		return arr.map(x => String(x));
+	}
+
 	// ===== Google Translate =====
 	// 免费、不需要 key、质量一般、风格直译。作为默认和兜底。
 	async function googleTranslate(text, targetLangCode, { signal } = {}) {
@@ -100,8 +128,21 @@ Rules:
 		return out.join('\n');
 	}
 
+
+	// Google 批量: 把多条消息按行拼接一次请求,行数对不上时退化为逐条。
+	// 每条消息内部的换行先压成空格 (直播聊天本来就是单行)。
+	async function googleTranslateBatch(items, targetLangCode, { signal } = {}) {
+		const flat = items.map(s => s.replace(/\s*\n\s*/g, ' '));
+		const joined = flat.join('\n');
+		const result = await googleTranslate(joined, targetLangCode, { signal });
+		const lines = result.split('\n');
+		if (lines.length === flat.length) return lines;
+		// 行数不符 (Google 偶尔会合并/拆分行): 退化为逐条并发
+		return Promise.all(flat.map(s => s.trim() ? googleTranslate(s, targetLangCode, { signal }) : Promise.resolve(s)));
+	}
+
 	// ===== Gemini =====
-	async function geminiTranslate(text, targetLangName, { signal, settings }) {
+	async function geminiTranslate(text, targetLangName, { signal, settings, _batch }) {
 		const key = settings.geminiApiKey;
 		if (!key) throw new ProviderError('Gemini API Key 未配置', 'auth');
 
@@ -109,9 +150,9 @@ Rules:
 		const url = `${GEMINI_API_BASE}/${encodeURIComponent(model)}:generateContent`;
 
 		const body = {
-			systemInstruction: { parts: [{ text: buildSystemPrompt(targetLangName) }] },
+			systemInstruction: { parts: [{ text: (_batch ? buildBatchSystemPrompt : buildSystemPrompt)(targetLangName) }] },
 			contents: [{ role: 'user', parts: [{ text }] }],
-			generationConfig: { temperature: 0.2, maxOutputTokens: 2048 },
+			generationConfig: { temperature: 0.2, maxOutputTokens: _batch ? 8192 : 2048 },
 		};
 
 		const resp = await fetch(url, {
@@ -151,7 +192,7 @@ Rules:
 	// ===== OpenAI 兼容 =====
 	// 用户自填 endpoint + model + key。覆盖 OpenAI 官方、DeepSeek、SiliconFlow、
 	// OpenRouter、Groq、本地 vLLM/Ollama (OpenAI 模式) 等所有 OpenAI 兼容服务。
-	async function openaiCompatTranslate(text, targetLangName, { signal, settings }) {
+	async function openaiCompatTranslate(text, targetLangName, { signal, settings, _batch }) {
 		const key = settings.openaiApiKey;
 		const endpoint = (settings.openaiEndpoint || '').trim();
 		const model = (settings.openaiModel || '').trim();
@@ -167,11 +208,11 @@ Rules:
 		const body = {
 			model,
 			messages: [
-				{ role: 'system', content: buildSystemPrompt(targetLangName) },
+				{ role: 'system', content: (_batch ? buildBatchSystemPrompt : buildSystemPrompt)(targetLangName) },
 				{ role: 'user', content: text },
 			],
 			temperature: 0.2,
-			max_tokens: 2048,
+			max_tokens: _batch ? 8192 : 2048,
 		};
 
 		const resp = await fetch(url, {
@@ -206,7 +247,7 @@ Rules:
 	// ===== Anthropic Claude =====
 	// 浏览器侧直连需要 dangerous-direct-browser-access header (官方文档说明的方式);
 	// 现在请求统一从 background service worker 发出,header 保留以防万一。
-	async function anthropicTranslate(text, targetLangName, { signal, settings }) {
+	async function anthropicTranslate(text, targetLangName, { signal, settings, _batch }) {
 		const key = settings.anthropicApiKey;
 		if (!key) throw new ProviderError('Anthropic API Key 未配置', 'auth');
 
@@ -215,8 +256,8 @@ Rules:
 
 		const body = {
 			model,
-			max_tokens: 2048,
-			system: buildSystemPrompt(targetLangName),
+			max_tokens: _batch ? 8192 : 2048,
+			system: (_batch ? buildBatchSystemPrompt : buildSystemPrompt)(targetLangName),
 			messages: [{ role: 'user', content: text }],
 			temperature: 0.2,
 		};
@@ -251,6 +292,19 @@ Rules:
 		return result.trim();
 	}
 
+
+	// ===== LLM 批量翻译 =====
+	// 三个 LLM provider 的批量实现只差"怎么发一次对话",这里复用单条函数的请求逻辑:
+	// 把 JSON 数组当作 user 消息、换批量 system prompt 即可。
+	function makeLlmBatch(singleTranslate) {
+		return async function (items, targetLangName, ctx) {
+			const payload = JSON.stringify(items);
+			// 偷换 system prompt: 通过 ctx 传一个标志,单条函数里判断
+			const raw = await singleTranslate(payload, targetLangName, { ...ctx, _batch: true });
+			return parseBatchResult(raw, items.length);
+		};
+	}
+
 	// ===== Provider 注册表 =====
 	const PROVIDERS = {
 		google: {
@@ -258,24 +312,28 @@ Rules:
 			name: 'Google 翻译',
 			needsKey: false,
 			translate: googleTranslate,
+			translateBatch: googleTranslateBatch,
 		},
 		gemini: {
 			id: 'gemini',
 			name: 'Gemini',
 			needsKey: true,
 			translate: geminiTranslate,
+			translateBatch: makeLlmBatch(geminiTranslate),
 		},
 		openai: {
 			id: 'openai',
 			name: 'OpenAI 兼容',
 			needsKey: true,
 			translate: openaiCompatTranslate,
+			translateBatch: makeLlmBatch(openaiCompatTranslate),
 		},
 		anthropic: {
 			id: 'anthropic',
 			name: 'Anthropic Claude',
 			needsKey: true,
 			translate: anthropicTranslate,
+			translateBatch: makeLlmBatch(anthropicTranslate),
 		},
 	};
 
