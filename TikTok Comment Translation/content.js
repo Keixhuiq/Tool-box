@@ -1,22 +1,29 @@
 // TikTok Comment Translator (Multi-Provider)
 // 基于 DuckCIT/TikTok-Comment-Translator (MIT)
 //
-// 主要改动:
-//   1. 翻译走 window.TTCTProviders 抽象,支持 Google/Gemini/OpenAI 兼容/Anthropic
-//   2. 移除"每条评论一次 Google 语言检测"——按钮直接显示,LLM prompt 已要求
-//      "原文已是目标语言则原样返回",成本省一大半
-//   3. 换语言不再需要 F5——按钮文案、缓存 key 都跟随 settings 实时变
-//   4. 每次翻译请求带超时 (默认 20s,AbortController)
-//   5. LRU 缓存上限 1000 条,避免长时间使用内存涨
-//   6. 全局并发上限 3,避免快速点击触发 429
-//   7. 4xx (auth/配置错) 不降级到 Google,让用户看到真实错误
-//   8. 翻译结果不再用 innerHTML 写入,改用 textContent + <br> 元素,避免 XSS
+// v1.3 主要改动:
+//   1. 翻译请求改走 background service worker (chrome.runtime.sendMessage),
+//      content script 不再直接 fetch——自定义端点不再受页面 CORS 限制
+//   2. 缓存改存 Promise: 同一文本并发点击只发一个请求 (in-flight 去重)
+//   3. 翻译进行中按钮置 data-state="loading" 并拒绝重复点击 (CSS 早就写好了,补上 JS)
+//   4. 原文用 innerText 而不是 textContent 读取——<br> 转成 \n,多行评论还原不再丢换行
+//   5. MutationObserver 固定挂 document.body——TikTok 是 SPA,挂在具体评论容器上
+//      会在切视频时随节点一起被销毁,新页面评论永远不出按钮
+//   6. 所有 TikTok DOM 选择器集中到 SELECTORS,改版断了只改一处
 
 (function () {
 	'use strict';
 
+	// ===== TikTok DOM 选择器 (改版后在这里统一修) =====
+	const SELECTORS = {
+		comment: '[data-e2e^="comment-level-"]',
+		replyButton: '[data-e2e^="comment-reply-"]',
+		replyWrapper: '[class*="DivReplyTriggerWrapper"]',
+		replyButtonTextInner: '[class*="P1-"], .tux-web-canary, [class*="text-container"] div, [class*="tux-button__text"]',
+		commentTextInner: 'span, p',
+	};
+
 	// ===== 配置 =====
-	const REQUEST_TIMEOUT_MS = 20000;
 	const CACHE_MAX_SIZE = 1000;
 	const MAX_CONCURRENT = 3;
 	const DEFAULT_SETTINGS = {
@@ -35,14 +42,14 @@
 	// ===== 状态 =====
 	let translations = {};
 	const settings = { ...DEFAULT_SETTINGS };
-	const { PROVIDERS, ProviderError } = window.TTCTProviders;
 
-	// LRU 缓存 (利用 Map 的插入顺序保证最近访问的在末尾)
+	// LRU 缓存。value 是 Promise<string>:
+	// 并发请求同一文本时第二个调用方直接 await 同一个 Promise,不会重复发请求。
 	const translationCache = new Map();
 	function cacheGet(key) {
 		if (!translationCache.has(key)) return undefined;
 		const v = translationCache.get(key);
-		// 重新插入,更新顺序
+		// 重新插入,更新 LRU 顺序
 		translationCache.delete(key);
 		translationCache.set(key, v);
 		return v;
@@ -154,60 +161,58 @@
 		return def?.geminiName || def?.popup?.languageNames?.[settings.targetLanguage] || settings.targetLanguage;
 	}
 
-	async function translateText(text) {
+	// 通过 background SW 翻译。返回 Promise<string>,失败 reject 一个带 kind 的 Error。
+	function requestTranslate(text) {
+		return new Promise((resolve, reject) => {
+			chrome.runtime.sendMessage(
+				{
+					type: 'ttct.translate',
+					text,
+					providerId: settings.provider || 'google',
+					targetLangCode: settings.targetLanguage,
+					targetLangName: getTargetLangName(),
+					settings,
+				},
+				resp => {
+					if (chrome.runtime.lastError) {
+						reject(new Error(chrome.runtime.lastError.message));
+						return;
+					}
+					if (resp?.ok) {
+						resolve(resp.result);
+					} else {
+						const e = new Error(resp?.error?.message || 'unknown error');
+						e.kind = resp?.error?.kind || 'other';
+						reject(e);
+					}
+				}
+			);
+		});
+	}
+
+	function translateText(text) {
 		const cacheKey = `${settings.provider}::${settings.targetLanguage}::${text}`;
 		const cached = cacheGet(cacheKey);
 		if (cached !== undefined) return cached;
 
-		await acquireSlot();
-		try {
-			const result = await doTranslate(text);
-			cacheSet(cacheKey, result);
-			return result;
-		} finally {
-			releaseSlot();
-		}
-	}
-
-	async function doTranslate(text) {
-		const providerId = settings.provider || 'google';
-		const provider = PROVIDERS[providerId] || PROVIDERS.google;
-
-		const controller = new AbortController();
-		const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-		try {
-			// Google 用语言码,LLM 用语言名
-			const target = providerId === 'google' ? settings.targetLanguage : getTargetLangName();
-			return await provider.translate(text, target, { signal: controller.signal, settings });
-		} catch (err) {
-			// 是否降级到 Google?
-			//   - 当前已经是 Google: 不降级
-			//   - auth 错误 (4xx): 不降级 (让用户看到 key 配错了)
-			//   - 用户关闭了降级: 不降级
-			//   - 其它 (网络/超时/server/safety): 降级
-			const isAuthError = err instanceof ProviderError && err.kind === 'auth';
-			const shouldFallback = providerId !== 'google'
-				&& !isAuthError
-				&& settings.llmFallbackToGoogle;
-
-			if (shouldFallback) {
-				console.warn(`[ttct] ${providerId} failed, falling back to Google:`, err.message);
-				const fallbackController = new AbortController();
-				const fallbackTimeout = setTimeout(() => fallbackController.abort(), REQUEST_TIMEOUT_MS);
-				try {
-					return await PROVIDERS.google.translate(text, settings.targetLanguage, {
-						signal: fallbackController.signal,
-						settings,
-					});
-				} finally {
-					clearTimeout(fallbackTimeout);
-				}
+		// 立即把 in-flight Promise 放进缓存——并发点击同一条评论只发一个请求
+		const promise = (async () => {
+			await acquireSlot();
+			try {
+				return await requestTranslate(text);
+			} finally {
+				releaseSlot();
 			}
-			throw err;
-		} finally {
-			clearTimeout(timeoutId);
-		}
+		})();
+
+		cacheSet(cacheKey, promise);
+		// 失败的 Promise 不留在缓存里,否则错误会被永久缓存,用户没法重试
+		promise.catch(() => {
+			if (translationCache.get(cacheKey) === promise) {
+				translationCache.delete(cacheKey);
+			}
+		});
+		return promise;
 	}
 
 	// ===== DOM 注入 =====
@@ -247,9 +252,7 @@
 		//   二级评论: replyEl 是 <button>,文字在内层的 <div class="tux-web-canary P1-Semibold">
 		let textEl = replyEl;
 		if (replyEl.tagName === 'BUTTON') {
-			// 优先找带 P1-* 或 tux-web-canary class 的内层 div (新 TUX 设计系统)
-			textEl = replyEl.querySelector('[class*="P1-"], .tux-web-canary, [class*="text-container"] div, [class*="tux-button__text"]')
-				|| replyEl;
+			textEl = replyEl.querySelector(SELECTORS.replyButtonTextInner) || replyEl;
 		}
 
 		function apply() {
@@ -277,16 +280,17 @@
 		comment.dataset.translateButtonAdded = 'true';
 
 		const texts = getTexts();
-		const originalLines = commentTextElement.textContent.split('\n');
+		// innerText 把 <br> 转成 \n;textContent 不会,会丢掉多行评论的换行
+		const originalLines = commentTextElement.innerText.split('\n');
 
 		const translateButton = document.createElement('span');
 		translateButton.innerText = texts.translate;
 		translateButton.classList.add('ttct-translate-button', 'translate-button');
 
-		const replyButton = container.querySelector('[data-e2e^="comment-reply-"]');
+		const replyButton = container.querySelector(SELECTORS.replyButton);
 		if (replyButton) {
 			// 原项目踩过的坑: 把按钮插在 DivReplyTriggerWrapper 之后,而不是 replyButton 之后
-			const replyWrapper = replyButton.closest('[class*="DivReplyTriggerWrapper"]');
+			const replyWrapper = replyButton.closest(SELECTORS.replyWrapper);
 			(replyWrapper || replyButton).insertAdjacentElement('afterend', translateButton);
 		} else {
 			container.appendChild(translateButton);
@@ -302,8 +306,12 @@
 		buttonRegistry.add(entry);
 
 		translateButton.addEventListener('click', async () => {
+			// 进行中拒绝重复点击 (配合 content.css 的 [data-state="loading"] 视觉提示)
+			if (translateButton.dataset.state === 'loading') return;
+
 			const curTexts = getTexts();
 			if (!entry.isTranslated) {
+				translateButton.dataset.state = 'loading';
 				translateButton.innerText = curTexts.translating;
 				try {
 					const translated = await translateText(originalText);
@@ -312,16 +320,16 @@
 					entry.isTranslated = true;
 				} catch (err) {
 					console.error('[ttct] translate error:', err);
-					// 把错误信息显示出来,带 provider 上下文
-					const msg = err instanceof ProviderError
-						? `[${err.kind}] ${err.message}`
-						: (err?.message || String(err));
+					// 把错误信息显示出来,带 kind 上下文 (auth/config/permission/...)
+					const msg = err.kind ? `[${err.kind}] ${err.message}` : (err?.message || String(err));
 					setTextWithLineBreaks(commentTextElement, `⚠ ${msg}`);
 					// 3 秒后恢复原文,让用户能再试
 					setTimeout(() => {
 						setTextWithLineBreaks(commentTextElement, originalLines.join('\n'));
 						translateButton.innerText = getTexts().translate;
 					}, 3000);
+				} finally {
+					delete translateButton.dataset.state;
 				}
 			} else {
 				setTextWithLineBreaks(commentTextElement, originalLines.join('\n'));
@@ -335,16 +343,16 @@
 
 	function tryAddButton(comment) {
 		if (comment.dataset.translateButtonAdded) return;
-		const container = comment.closest('div')?.querySelector('[data-e2e^="comment-reply-"]')?.parentElement
+		const container = comment.closest('div')?.querySelector(SELECTORS.replyButton)?.parentElement
 			|| comment.closest('div');
 		if (!container) return;
-		const commentTextElement = comment.querySelector('span, p') || comment;
-		const originalText = commentTextElement.textContent.trim();
+		const commentTextElement = comment.querySelector(SELECTORS.commentTextInner) || comment;
+		const originalText = commentTextElement.innerText.trim();
 		addTranslateButton(comment, container, commentTextElement, originalText);
 	}
 
 	function processExistingComments() {
-		document.querySelectorAll('[data-e2e^="comment-level-"]').forEach(tryAddButton);
+		document.querySelectorAll(SELECTORS.comment).forEach(tryAddButton);
 	}
 
 	function startObserver() {
@@ -352,18 +360,17 @@
 			for (const mutation of mutations) {
 				for (const node of mutation.addedNodes) {
 					if (node.nodeType !== 1) continue;
-					if (node.matches?.('[data-e2e^="comment-level-"]')) {
+					if (node.matches?.(SELECTORS.comment)) {
 						tryAddButton(node);
 					}
-					node.querySelectorAll?.('[data-e2e^="comment-level-"]').forEach(tryAddButton);
+					node.querySelectorAll?.(SELECTORS.comment).forEach(tryAddButton);
 				}
 			}
 		});
 
-		const commentSection =
-			document.querySelector('[class*="DivCommentItemContainer"]') ||
-			document.querySelector('[class*="DivCommentObjectWrapper"]') ||
-			document.body;
-		observer.observe(commentSection, { childList: true, subtree: true });
+		// 固定挂 document.body: TikTok 是 SPA,挂在具体评论容器上,
+		// 切视频时容器被整个替换,observer 跟着失效,新评论永远不出按钮。
+		// body 上的回调有 matches 快速过滤,开销可接受。
+		observer.observe(document.body, { childList: true, subtree: true });
 	}
 })();
