@@ -1,4 +1,4 @@
-// background.js v2.1.1 - TikTok 无水印下载
+// background.js v2.2.0 - TikTok 无水印下载
 // 职责：
 //   1) 维护 Referer 规则（让 TikTok CDN 域名的请求带正确的 Referer）
 //   2) 解析 CDN 重定向（fetch 跟随 302，把短 URL 换成最终 URL）
@@ -59,10 +59,29 @@ function makeRule(id, urlFilter) {
         },
         condition: {
             urlFilter,
-            resourceTypes: ['xmlhttprequest', 'media', 'other', 'main_frame', 'sub_frame', 'image']
+            // 关键：DNR 动态规则是全浏览器生效的。
+            // initiatorDomains 把改写范围限定为：
+            //   1) tiktok.com 页面（content script 的 fetch 以页面为 initiator）
+            //   2) 扩展自身（service worker 的 resolveUrl/fetchBlob，initiator 是 chrome-extension://<id>）
+            // 这样用户正常浏览其他 ByteDance 系站点不会被改 Referer。
+            initiatorDomains: [chrome.runtime.id, 'tiktok.com'],
+            // 不含 main_frame/sub_frame：下载只涉及 XHR/媒体/图片，不应改写页面导航的 Referer
+            resourceTypes: ['xmlhttprequest', 'media', 'image', 'other']
         }
     };
 }
+
+// ===== 全局快捷键（chrome://extensions/shortcuts 可自定义，默认 Alt+D） =====
+chrome.commands.onCommand.addListener(async (command) => {
+    if (command !== 'download-current') return;
+    try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        // tab.url 仅对持有 host 权限的域可见；非 TikTok 页面时为 undefined，自动跳过
+        if (tab?.id && /^https?:\/\/([^/]*\.)?tiktok\.com\//.test(tab.url || '')) {
+            chrome.tabs.sendMessage(tab.id, { action: 'trigger_download' }).catch(() => { });
+        }
+    } catch (e) { /* ignore */ }
+});
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.action === 'resolve_url') {

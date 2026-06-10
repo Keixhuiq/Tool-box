@@ -1,3 +1,4 @@
+/* v2.2.0：悬浮按钮已移除，页面注入样式只剩下载进度 toast */
 .tt-dl-toast {
     position: fixed;
     top: 80px;
@@ -14,58 +15,4 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
     backdrop-filter: blur(8px);
-}
-
-.tt-dl-float {
-    position: fixed;
-    bottom: 80px;
-    right: 24px;
-    z-index: 2147483646;
-    user-select: none;
-    -webkit-user-select: none;
-    touch-action: none;
-}
-
-/* TikTok 配色：青蓝 + 品红双色描边 */
-.tt-dl-float-btn {
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    background: #000;
-    color: #fff;
-    border: none;
-    cursor: grab;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow:
-        0 0 0 2px rgba(37, 244, 238, 0.6),
-        2px 2px 0 0 #fe2c55,
-        0 4px 14px rgba(0, 0, 0, 0.35);
-    transition: transform 0.2s, box-shadow 0.2s;
-    font-size: 22px;
-}
-
-.tt-dl-float-btn:hover {
-    transform: scale(1.08);
-    box-shadow:
-        0 0 0 2px rgba(37, 244, 238, 0.85),
-        3px 3px 0 0 #fe2c55,
-        0 6px 20px rgba(0, 0, 0, 0.5);
-}
-
-.tt-dl-float-btn:active {
-    cursor: grabbing;
-    transform: scale(0.96);
-}
-
-.tt-dl-float-btn.loading {
-    opacity: 0.6;
-    pointer-events: none;
-    animation: tt-dl-pulse 1s ease-in-out infinite;
-}
-
-@keyframes tt-dl-pulse {
-    0%, 100% { opacity: 0.6; }
-    50% { opacity: 0.3; }
 }

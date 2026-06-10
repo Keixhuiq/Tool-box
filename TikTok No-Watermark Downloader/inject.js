@@ -1,10 +1,11 @@
-// inject.js v2.1.1 - TikTok 无水印下载 (MAIN world)
-// 改进：
-//   1. 抖音 v4.1 风格的 LRU cache + Map 维护
-//   2. 同时 hook JSON.parse 和 Response.prototype.json
-//   3. 扫描 __UNIVERSAL_DATA_FOR_REHYDRATION__ / SIGI_STATE / __NEXT_DATA__
-//   4. 明确标记每个 bitRate 是否为 adapt 流（DASH 纯视频，无音频）
-//   5. 提取 music.playUrl 作为独立音频源
+// inject.js v2.2.0 - TikTok 无水印下载 (MAIN world)
+// v2.2.0 变更：
+//   1. 移除 window.fetch hook：JSON.parse hook 覆盖 text()+parse 与 XHR 路径，
+//      Response.prototype.json hook 覆盖 .json() 路径，三者重叠导致同一响应被
+//      扫描 2-3 遍且每个 API 响应都被 clone 一份。如果某些页面检测回归，
+//      可考虑按 URL 白名单恢复 fetch hook。
+//   2. message 监听补 event.source !== window 检查
+//   3. SPA 路由检测：300ms setInterval 轮询 → hook history.pushState/replaceState + popstate
 //
 // TikTok 数据结构：
 //   视频: itemStruct.video.{playAddr, downloadAddr, bitrateInfo, bitrate}
@@ -22,7 +23,6 @@
     let latestId = '';
     const _parse = JSON.parse;
     const _respJson = Response.prototype.json;
-    const _fetch = window.fetch;
 
     function storeSet(id, data) {
         if (videoStore.has(id)) videoStore.delete(id);
@@ -313,35 +313,9 @@
         });
     };
 
-    // Hook fetch — TikTok 的 SPA 大量走 fetch().clone().text()，这是兜底
-    window.fetch = function () {
-        const fetchArgs = arguments;
-        let fetchUrl = '';
-        try {
-            fetchUrl = (fetchArgs[0] && fetchArgs[0].url) || String(fetchArgs[0] || '');
-        } catch (e) { }
-
-        const result = _fetch.apply(this, fetchArgs);
-
-        if (fetchUrl.indexOf('/api/') !== -1 || fetchUrl.indexOf('item') !== -1
-            || fetchUrl.indexOf('detail') !== -1 || fetchUrl.indexOf('aweme') !== -1) {
-            result.then(resp => {
-                try {
-                    resp.clone().text().then(text => {
-                        try {
-                            const data = _parse(text);
-                            if (data && typeof data === 'object') scanForItems(data, 0);
-                        } catch (e) { }
-                    }).catch(() => { });
-                } catch (e) { }
-            }).catch(() => { });
-        }
-        return result;
-    };
-
     // 查询接口
     window.addEventListener('message', (e) => {
-        if (!e.data) return;
+        if (e.source !== window || !e.data) return;
         if (e.data.type === '__TT_DL_QUERY__') {
             const tid = e.data.awemeId || '';
             let result = null;
@@ -391,15 +365,25 @@
         setTimeout(scanRehydrationData, 300);
     }
 
-    // SPA 路由变化（TikTok 也是 SPA）→ 重新扫
-    let _lastUrl = location.href;
-    setInterval(() => {
-        if (location.href !== _lastUrl) {
-            _lastUrl = location.href;
-            setTimeout(scanRehydrationData, 500);
-            setTimeout(scanRehydrationData, 1500);
-        }
-    }, 300);
+    // SPA 路由变化 → 重新扫页面内嵌数据
+    // hook history API + popstate，替代 setInterval 轮询
+    function onRouteChange() {
+        setTimeout(scanRehydrationData, 500);
+        setTimeout(scanRehydrationData, 1500);
+    }
+    const _pushState = history.pushState;
+    const _replaceState = history.replaceState;
+    history.pushState = function () {
+        const r = _pushState.apply(this, arguments);
+        onRouteChange();
+        return r;
+    };
+    history.replaceState = function () {
+        const r = _replaceState.apply(this, arguments);
+        onRouteChange();
+        return r;
+    };
+    window.addEventListener('popstate', onRouteChange);
 
-    console.log('[TT-DL] inject.js v2.1.1 loaded');
+    console.log('[TT-DL] inject.js v2.2.0 loaded');
 })();

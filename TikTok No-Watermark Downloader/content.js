@@ -1,5 +1,13 @@
-// content.js v2.1.1 - TikTok 无水印下载
+// content.js v2.2.0 - TikTok 无水印下载
 // 基于抖音 v4.1 的下载架构 + TikTok 视频/音频分离处理
+//
+// v2.2.0 变更：
+//   1. 移除页面悬浮按钮，下载入口改为扩展弹窗 UI + 快捷键
+//      （页内 Shift+D 保留；新增 commands 全局快捷键，默认 Alt+D 可自定义）
+//   2. blob URL 延迟 5 分钟再 revoke（30 秒太短，用户在 Save As 弹框里
+//      停留超时会导致下载失败）
+//   3. MP4 尾部 moov 检测改为字节签名搜索（原实现从任意偏移按 box 结构
+//      解析，起点几乎必然落在 mdat 中间，立即失败）
 //
 // 视频处理策略：
 //   1. TikTok 高画质（如 1080p）通常是 DASH adapt 流 - 纯视频，无音频
@@ -11,8 +19,6 @@
 
     // ===== 默认配置 =====
     const DEFAULTS = Object.freeze({
-        showFloatBtn: true,
-        floatPos: { right: 24, bottom: 80 },
         filenameTpl: '{title}@{author}',
         videoMode: 'split',          // 'split' = 视频+音频两文件 / 'merged' = 单文件含音频
         quality: 'best',              // best | second | lowest
@@ -35,7 +41,6 @@
         for (const k of Object.keys(changes)) {
             if (k in CFG) CFG[k] = changes[k].newValue ?? DEFAULTS[k];
         }
-        applyButtonVisibility();
     });
 
     function log(...args) { if (CFG.debug) console.log('[TT-DL]', ...args); }
@@ -310,10 +315,12 @@
         a.style.display = 'none';
         document.body.appendChild(a);
         a.click();
+        // 注意：必须给用户在 Save As 弹框里挑目录留足时间。
+        // 30 秒太短——弹框未确认前 revoke 会让下载直接失败。
         setTimeout(() => {
             a.remove();
             URL.revokeObjectURL(a.href);
-        }, 30000);
+        }, 5 * 60 * 1000);
     }
 
     // 流式 fetch
@@ -403,13 +410,30 @@
             return null;
         }
 
-        // 兜底：moov 可能在末尾。读末尾 4MB（足以覆盖绝大多数视频的 moov）
+        // 兜底：moov 可能在末尾（ffmpeg 默认输出）。读末尾 4MB。
+        // 注意：尾部 buffer 的起点几乎必然落在 mdat 数据中间，不能从偏移 0
+        // 按 box 结构解析（前 8 字节是视频数据，type 检查立即失败）。
+        // 正确做法：搜索 'moov' 字节签名（0x6d 0x6f 0x6f 0x76），向前回看
+        // 4B size 验证合法后，再从该 box 起点开始 walk。
         if (blob.size > HEAD_SIZE) {
             try {
                 const tailStart = Math.max(0, blob.size - 4 * 1024 * 1024);
                 const tailBuf = await blob.slice(tailStart).arrayBuffer();
-                const result = scanForAudioTrack(new DataView(tailBuf), 0, tailBuf.byteLength);
-                if (result !== null) return result;
+                const bytes = new Uint8Array(tailBuf);
+                const view = new DataView(tailBuf);
+                for (let i = 4; i + 4 <= bytes.length; i++) {
+                    if (bytes[i] === 0x6d && bytes[i + 1] === 0x6f
+                        && bytes[i + 2] === 0x6f && bytes[i + 3] === 0x76) {
+                        const boxStart = i - 4;
+                        const size = view.getUint32(boxStart, false);
+                        // size 合法性：至少容纳 header，且不应远超 buffer 剩余长度
+                        if (size >= 8 && boxStart + size <= tailBuf.byteLength + 1024) {
+                            const result = scanForAudioTrack(
+                                view, boxStart, Math.min(boxStart + size, tailBuf.byteLength));
+                            if (result !== null) return result;
+                        }
+                    }
+                }
             } catch (e) {
                 warn('detectMp4HasAudio: tail parse failed:', e.message);
             }
@@ -484,7 +508,7 @@
                     if (foundSound) return;
                 }
 
-                if (size === 0) return;
+                // size===0 的情况已在前面改写为 finish - pos，这里 size 必然 > 0
                 pos += size;
             }
         }
@@ -854,134 +878,70 @@
         return s || 'TikTok';
     }
 
-    // ===== 悬浮按钮（与抖音版一致） =====
+    // ===== 下载入口：弹窗 UI / 全局快捷键 / 页内快捷键 =====
+    // v2.2.0 起不再有页面悬浮按钮，触发路径：
+    //   1) popup「下载当前作品」按钮 → trigger_download 消息
+    //   2) commands 全局快捷键（默认 Alt+D，chrome://extensions/shortcuts 可改）
+    //      → background → trigger_download 消息
+    //   3) 页内 Shift+D（仅页面聚焦时有效）
 
-    function clampPos(pos) {
-        const minX = 8, minY = 8;
-        const maxX = Math.max(minX, innerWidth - 58);
-        const maxY = Math.max(minY, innerHeight - 58);
-        return {
-            right: Math.min(Math.max(pos.right ?? 24, minX), maxX),
-            bottom: Math.min(Math.max(pos.bottom ?? 80, minY), maxY),
-        };
+    let downloading = false;
+
+    function safeTriggerDownload() {
+        if (downloading) { showToast('⏳ 正在下载中…'); return; }
+        downloading = true;
+        triggerDownload()
+            .catch(err => { warn('exception:', err); showToast('❌ ' + err.message); })
+            .finally(() => { downloading = false; });
     }
 
-    function applyButtonPos(wrap) {
-        const p = clampPos(CFG.floatPos || DEFAULTS.floatPos);
-        wrap.style.right = p.right + 'px';
-        wrap.style.bottom = p.bottom + 'px';
-    }
-
-    function applyButtonVisibility() {
-        const wrap = document.getElementById('tt-dl-float');
-        if (!wrap) return;
-        wrap.style.display = CFG.showFloatBtn ? '' : 'none';
-        applyButtonPos(wrap);
-    }
-
-    function createFloatButton() {
-        if (document.getElementById('tt-dl-float')) return;
-        const wrap = document.createElement('div');
-        wrap.className = 'tt-dl-float';
-        wrap.id = 'tt-dl-float';
-
-        const btn = document.createElement('button');
-        btn.className = 'tt-dl-float-btn';
-        btn.innerHTML = '⬇';
-        btn.title = 'Download current post (no watermark)\nDrag to move\nShortcut: Shift+D';
-
-        wrap.appendChild(btn);
-        document.body.appendChild(wrap);
-        applyButtonPos(wrap);
-        applyButtonVisibility();
-
-        let down = null;
-        let dragging = false;
-
-        function onDown(e) {
-            const pt = e.touches ? e.touches[0] : e;
-            down = {
-                x: pt.clientX, y: pt.clientY,
-                r: parseFloat(wrap.style.right) || 24,
-                b: parseFloat(wrap.style.bottom) || 80,
-            };
-            dragging = false;
-            window.addEventListener('mousemove', onMove);
-            window.addEventListener('mouseup', onUp);
-            window.addEventListener('touchmove', onMove, { passive: false });
-            window.addEventListener('touchend', onUp);
+    chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+        if (msg?.action === 'trigger_download') {
+            safeTriggerDownload();
+            sendResponse({ ok: true });
+            return false;
         }
-        function onMove(e) {
-            if (!down) return;
-            const pt = e.touches ? e.touches[0] : e;
-            const dx = pt.clientX - down.x;
-            const dy = pt.clientY - down.y;
-            if (!dragging && Math.hypot(dx, dy) < 5) return;
-            dragging = true;
-            if (e.cancelable) e.preventDefault();
-            const np = clampPos({ right: down.r - dx, bottom: down.b - dy });
-            wrap.style.right = np.right + 'px';
-            wrap.style.bottom = np.bottom + 'px';
+        // popup 打开时查询当前作品信息，用于预览
+        if (msg?.action === 'get_post_info') {
+            getCurrentData().then(data => {
+                if (!data) { sendResponse({ ok: false }); return; }
+                sendResponse({
+                    ok: true,
+                    info: {
+                        awemeId: data.awemeId,
+                        type: data.type,
+                        subType: data.subType || null,
+                        desc: data.desc || '',
+                        author: data.author || '',
+                        imageCount: data.images?.length || 0,
+                        clipCount: data.clipVideos?.length || 0,
+                        normalCount: (data.bitRateList || []).filter(br => !br.isAdapt).length,
+                        adaptCount: (data.bitRateList || []).filter(br => br.isAdapt).length,
+                        hasAudio: !!data.audioUrl,
+                    },
+                });
+            }).catch(() => sendResponse({ ok: false }));
+            return true;   // 异步 sendResponse
         }
-        function onUp() {
-            window.removeEventListener('mousemove', onMove);
-            window.removeEventListener('mouseup', onUp);
-            window.removeEventListener('touchmove', onMove);
-            window.removeEventListener('touchend', onUp);
-            if (dragging) {
-                const pos = {
-                    right: parseFloat(wrap.style.right) || 24,
-                    bottom: parseFloat(wrap.style.bottom) || 80,
-                };
-                CFG.floatPos = pos;
-                chrome.storage.sync.set({ floatPos: pos });
-            }
-            setTimeout(() => { dragging = false; }, 50);
-            down = null;
-        }
-
-        btn.addEventListener('mousedown', onDown);
-        btn.addEventListener('touchstart', onDown, { passive: true });
-
-        btn.addEventListener('click', (e) => {
-            if (dragging) { e.preventDefault(); e.stopPropagation(); return; }
-            btn.classList.add('loading');
-            triggerDownload()
-                .catch(err => { warn('exception:', err); showToast('❌ ' + err.message); })
-                .finally(() => setTimeout(() => btn.classList.remove('loading'), 2000));
-        });
-    }
+    });
 
     document.addEventListener('keydown', (e) => {
         if (e.shiftKey && (e.key === 'D' || e.key === 'd')) {
             const t = document.activeElement?.tagName?.toLowerCase();
             if (t === 'input' || t === 'textarea' || document.activeElement?.contentEditable === 'true') return;
             e.preventDefault();
-            triggerDownload();
+            safeTriggerDownload();
         }
     });
 
     async function init() {
         await loadConfig();
-        createFloatButton();
-        log('v2.1.1 loaded | config:', CFG);
+        log('v2.2.0 loaded | config:', CFG);
     }
 
     if (document.readyState === 'complete' || document.readyState === 'interactive') {
-        setTimeout(init, 500);
+        init();
     } else {
-        window.addEventListener('DOMContentLoaded', () => setTimeout(init, 500));
+        window.addEventListener('DOMContentLoaded', init);
     }
-
-    // SPA 路由变化 → 按钮被抖音/TikTok 清掉后补回
-    let lastUrl = location.href;
-    new MutationObserver(() => {
-        if (location.href !== lastUrl) {
-            lastUrl = location.href;
-            setTimeout(() => {
-                createFloatButton();
-                applyButtonVisibility();
-            }, 500);
-        }
-    }).observe(document.body, { childList: true, subtree: true });
 })();

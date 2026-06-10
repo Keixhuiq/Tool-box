@@ -1,10 +1,20 @@
-# TikTok No-Watermark Downloader（v2.1.1）
+# TikTok No-Watermark Downloader（v2.2.0）
 
 在 TikTok 网页版下载无水印的视频、图集和视频集。Chrome / Edge Manifest V3 扩展。
 
 姊妹扩展：[Douyin-No-Watermark-Download](../Douyin-No-Watermark-Download) — 共用同一套架构，差异只在数据提取逻辑与 CDN 域。
 
 ## 更新说明
+
+### v2.2.0
+
+- **下载入口改版**：移除页面悬浮按钮，下载入口改为扩展弹窗——打开弹窗可预览当前检测到的作品（类型/标题/作者/流信息），一键下载。页内 `Shift+D` 保留，并通过 `commands` API 新增可自定义的全局快捷键（默认 `Alt+D`，在 `chrome://extensions/shortcuts` 修改）。
+- **修复 MP4 尾部音轨检测**：原实现从尾部 buffer 偏移 0 按 box 结构解析，起点几乎必然落在 mdat 数据中间导致立即失败。改为搜索 `moov` 字节签名后再解析，moov-at-end 的视频现在能正确判断是否含音轨。
+- **修复 blob URL 过早失效**：下载触发后 blob URL 的回收从 30 秒延长到 5 分钟，避免用户在 Save As 弹框里停留较久导致下载失败。
+- **DNR 规则收敛作用域**：Referer 改写规则新增 `initiatorDomains` 限定（仅 TikTok 页面与扩展自身发起的请求），并去掉 `main_frame`/`sub_frame`。此前规则是全浏览器生效的，会改写用户正常浏览其他 ByteDance 系站点的 Referer。
+- **性能**：移除 `window.fetch` hook（与 `JSON.parse`、`Response.json` 两个 hook 重叠，导致同一响应被扫描多遍且每个 API 响应被 clone 一份）；SPA 路由检测从 300ms 轮询改为 hook history API。
+- **权限收敛**：去掉冗余的 `declarativeNetRequest` 权限（已有 host_permissions 时 `declarativeNetRequestWithHostAccess` 足够）。
+- 扩展图标更换为 TikTok 应用图标（16/32/48/128 全尺寸）。
 
 ### v2.1.1
 
@@ -20,8 +30,8 @@
   - 「兼容」模式：直接下 `normal_*` 合成流，单文件含音频，画质较低
 - **三种内容**：单视频、图集（多图）、视频集（图集里内嵌视频）都支持，混合作品也能下。
 - **画质选择**：可选最高 / 次高 / 最低画质；最高画质链接失效时会自动降级重试。
-- **可拖动悬浮按钮**：右下角的下载按钮可以拖到任意位置，位置会被记住；不喜欢可直接关掉。
-- **快捷键**：`Shift + D` 触发下载；可在 `chrome://extensions/shortcuts` 配置全局快捷键。
+- **弹窗下载入口**：点扩展图标打开弹窗，可预览当前检测到的作品并一键下载，设置与说明都在同一面板。
+- **快捷键**：页内 `Shift + D`；全局快捷键默认 `Alt + D`，可在 `chrome://extensions/shortcuts` 自定义。
 - **文件名模板**：支持 `{title} {author} {id} {date}` 占位符。
 - **保存位置**：用浏览器原生下载触发（`<a download>`），Save As 弹框会自动记住上次保存位置。
 
@@ -35,9 +45,7 @@
 
 ## 使用
 
-打开任意 TikTok 视频/图集页面，按 `Shift + D` 或点右下角按钮即可下载。
-
-按右上角扩展图标可以打开设置面板。
+打开任意 TikTok 视频/图集页面，按 `Shift + D`（或全局 `Alt + D`）即可下载；也可以点右上角扩展图标，在弹窗里预览作品并点「下载当前作品」。设置和使用说明都在弹窗里。
 
 ### 视频下载模式
 
@@ -61,10 +69,10 @@ ffmpeg -i video.mp4 -i audio.m4a -c copy output.mp4
 
 | 文件 | 作用 |
 | --- | --- |
-| `inject.js` | MAIN world 注入。hook `JSON.parse` + `Response.prototype.json` + `fetch`，扫描 `__UNIVERSAL_DATA_FOR_REHYDRATION__` / `SIGI_STATE` / `__NEXT_DATA__`。提取 `bitrateInfo`（标记是否为 adapt 流）和 `music.playUrl`。 |
+| `inject.js` | MAIN world 注入。hook `JSON.parse` + `Response.prototype.json`，扫描 `__UNIVERSAL_DATA_FOR_REHYDRATION__` / `SIGI_STATE` / `__NEXT_DATA__`。提取 `bitrateInfo`（标记是否为 adapt 流）和 `music.playUrl`。 |
 | `content.js` | ISOLATED world。负责 UI、当前作品识别、下载调度。视频模式分流（split/merged）+ 多 URL fallback + CORS fallback。 |
 | `background.js` | service worker。用 `declarativeNetRequest` 给 TikTok CDN 域的请求改写 Referer；提供 `fetch` 解析 CDN 重定向；为 CORS 受限的 CDN（如音频）代取 ArrayBuffer。下载本身由 content.js 用 fetch+blob+`<a download>` 触发，Save As 弹框会记住上次位置。 |
-| `popup.html/css/js` | 设置面板。 |
+| `popup.html/css/js` | 下载入口 + 作品预览 + 设置面板。 |
 
 ## 隐私
 

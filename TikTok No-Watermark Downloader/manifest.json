@@ -1,11 +1,10 @@
 {
   "manifest_version": 3,
   "name": "TikTok 无水印下载",
-  "version": "2.1.1",
-  "description": "在 TikTok 网页版下载无水印视频/图集。大视频自动分离视频+音频或下载含音频版本（可切换）。点击悬浮按钮或 Shift+D。",
+  "version": "2.2.0",
+  "description": "在 TikTok 网页版下载无水印视频/图集。大视频自动分离视频+音频或下载含音频版本（可切换）。点击扩展图标或按快捷键下载。",
   "permissions": [
     "storage",
-    "declarativeNetRequest",
     "declarativeNetRequestWithHostAccess"
   ],
   "host_permissions": [
@@ -37,15 +36,27 @@
   "background": {
     "service_worker": "background.js"
   },
+  "commands": {
+    "download-current": {
+      "suggested_key": {
+        "default": "Alt+D"
+      },
+      "description": "下载当前作品（无水印）"
+    }
+  },
   "action": {
     "default_popup": "popup.html",
     "default_title": "TikTok 无水印下载",
     "default_icon": {
+      "16": "icon16.png",
+      "32": "icon32.png",
       "48": "icon48.png",
       "128": "icon128.png"
     }
   },
   "icons": {
+    "16": "icon16.png",
+    "32": "icon32.png",
     "48": "icon48.png",
     "128": "icon128.png"
   }
