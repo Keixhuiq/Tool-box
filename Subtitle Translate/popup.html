@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { width: 320px; padding: 15px; font-family: Arial, sans-serif; background: #141414; color: #e5e5e5; }
+    h2 { margin-top: 0; color: #e50914; }
+    .setting-group { margin-bottom: 12px; }
+    label { display: block; margin-bottom: 4px; font-weight: bold; font-size: 13px; }
+    select, input[type="text"], input[type="password"], input[type="range"] {
+      width: 100%; padding: 6px; box-sizing: border-box;
+      background: #333; color: #fff; border: 1px solid #555; border-radius: 4px;
+    }
+    select:focus, input:focus { outline: none; border-color: #e50914; }
+    .switch-container { display: flex; align-items: center; justify-content: space-between; }
+    .hint { font-size: 11px; color: #888; margin-top: 3px; }
+    #saveBtn {
+      width: 100%; padding: 10px; background: #e50914; color: white;
+      border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold;
+    }
+    #saveBtn:hover { background: #c0070f; }
+    .divider { border-top: 1px solid #333; margin: 12px 0; }
+    .badge {
+      display: inline-block; background: #e50914; color: white;
+      font-size: 10px; padding: 1px 6px; border-radius: 10px; margin-left: 6px;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+  <h2>🎬 字幕翻译器 <span class="badge">v3.7</span></h2>
+
+  <div class="setting-group switch-container">
+    <label for="enableToggle">开启翻译</label>
+    <input type="checkbox" id="enableToggle">
+  </div>
+
+  <div class="setting-group">
+    <label for="apiProvider">API 提供商</label>
+    <select id="apiProvider">
+      <option value="gemini">Gemini (推荐)</option>
+      <option value="google">Google 免费翻译</option>
+      <option value="openai">OpenAI / 兼容端点</option>
+      <option value="claude">Claude</option>
+    </select>
+  </div>
+
+  <div class="setting-group" id="endpointGroup" style="display:none;">
+    <label for="openaiEndpoint">Endpoint（可选）</label>
+    <input type="text" id="openaiEndpoint" placeholder="默认: https://api.openai.com/v1">
+    <div class="hint">支持中转站 / one-api / vLLM / Ollama 等 OpenAI 兼容端点，填基础 URL 即可（自动补 /chat/completions）。自定义域名首次使用需点"测试连接"授权</div>
+  </div>
+
+  <div class="setting-group" id="apiKeyGroup">
+    <label for="apiKey">API Key</label>
+    <input type="password" id="apiKey" placeholder="输入你的 API Key">
+    <div class="hint">每个提供商的 Key 分开保存，切换不会丢失</div>
+  </div>
+
+  <div class="setting-group" id="customModelGroup">
+    <label for="customModel">模型名（可选）</label>
+    <input type="text" id="customModel" placeholder="">
+    <div class="hint" id="modelHint"></div>
+  </div>
+
+  <div class="setting-group" id="testGroup" style="display:none;">
+    <button id="testBtn" style="width:100%; padding:8px; background:#333; color:#e5e5e5; border:1px solid #555; border-radius:4px; cursor:pointer;">🔌 测试连接</button>
+    <div class="hint" id="testResult"></div>
+  </div>
+
+  <div class="setting-group">
+    <label for="targetLang">目标语言</label>
+    <select id="targetLang">
+      <option value="zh">中文</option>
+      <option value="en">English</option>
+      <option value="ja">日本語</option>
+    </select>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="setting-group">
+    <label for="displayMode">显示模式</label>
+    <select id="displayMode">
+      <option value="overlay">双语替换（隐藏原字幕，自绘双语）</option>
+      <option value="below">原字幕下方（继承原字幕样式）</option>
+    </select>
+    <div class="hint">"原字幕下方"模式跟随 Netflix 字幕外观设置的字体/字号/颜色；原字幕贴底时译文自动翻到上方</div>
+  </div>
+
+  <div class="setting-group">
+    <label for="contextWindow">翻译上下文窗口: <span id="contextValue">3</span> 句</label>
+    <input type="range" id="contextWindow" min="0" max="5" value="3">
+    <div class="hint">翻译当前字幕时附带前后各 N 句作参考，提升指代/语气连贯性。0=不带上下文（最省 token），3=推荐</div>
+  </div>
+
+  <div class="setting-group">
+    <label for="subPosition">字幕位置 (底部距离: <span id="positionValue">10</span>%)</label>
+    <input type="range" id="subPosition" min="5" max="50" value="10">
+    <div class="hint">仅"双语替换"模式生效；"原字幕下方"模式自动跟随原字幕位置</div>
+  </div>
+
+  <button id="saveBtn">💾 保存设置</button>
+
+  <script src="popup.js"></script>
+</body>
+</html>

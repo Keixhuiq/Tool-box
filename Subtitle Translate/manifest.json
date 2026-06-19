@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "Subtitle Translate",
+  "version": "3.7",
+  "description": "使用AI大模型预翻译Netflix字幕，零延迟双语显示。支持OpenAI兼容端点。",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "*://*.netflix.com/*",
+    "*://*.nflxvideo.net/*",
+    "*://api.openai.com/*",
+    "*://api.anthropic.com/*",
+    "*://generativelanguage.googleapis.com/*",
+    "*://translate.googleapis.com/*"
+  ],
+  "optional_host_permissions": [
+    "*://*/*"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.netflix.com/*"],
+      "js": ["interceptor.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["*://*.netflix.com/*"],
+      "js": ["bridge.js"],
+      "run_at": "document_start"
+    }
+  ]
+}
